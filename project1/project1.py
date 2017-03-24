@@ -10,10 +10,10 @@ Created on Mon Mar 20 14:44:30 2017
 
 #Aquinas - http://thelatinlibrary.com/aquinas.html
 #Claudius Caesar - http://thelatinlibrary.com/claud.inscr.html
-#Historia Augusta - http://www.thelatinlibrary.com/sha.html
+#Bernard of Clairvaux - http://www.thelatinlibrary.com/bernardclairvaux.shtml
 #Roman Epitaphs - http://www.thelatinlibrary.com/epitaphs.html
 #Anselm - http://www.thelatinlibrary.com/anselm.html
-#Christian Credds - http://www.thelatinlibrary.com/creeds.html
+#Christian Creeds - http://www.thelatinlibrary.com/creeds.html
 #Sulpicius Severus - http://www.thelatinlibrary.com/sulpiciusseverus.html
 
 
@@ -30,7 +30,7 @@ import random
 
 links={"Aquinas":"http://thelatinlibrary.com/aquinas.html",
        "Claudius Caesar":"http://thelatinlibrary.com/claud.inscr.html",
-       "Historia Augusta":"http://www.thelatinlibrary.com/sha.html",
+       "Bernard of Clairvaux":"http://www.thelatinlibrary.com/bernardclairvaux.shtml",
        "Roman Epitaphs":"http://www.thelatinlibrary.com/epitaphs.html",
        "Anselm":"http://www.thelatinlibrary.com/anselm.html",
        "Christian Creeds":"http://www.thelatinlibrary.com/creeds.html",
@@ -307,7 +307,6 @@ def fetchSeverus():
     
     returnList = []
     innerList = []
-    returnList = []
 
     #nested for loop to cycle through each link
     #all text from each link is added to the same list of lists
@@ -328,7 +327,6 @@ def fetchSeverus():
                 chapter = re.search(r'^[0-9]+',innerS).group(0)
                 verseNum = 1
                 continue
-            print(chapter)
             innerList = [title,book,"Latin",author,dates,chapter,verseNum,
                      innerS,("http://thelatinlibrary.com/" + testLinks[1])]
             verseNum += 1
@@ -338,6 +336,40 @@ def fetchSeverus():
     #Possibly may have to come back here and cast the versenum to a string
         
     
+    
+def fetchBernard():  
+#Function that retrieves the works of St. Bernard of Clairvaux from the
+#latin library and returns a list of list formatted per the database
+#schema of sqlite createDB function
+    global links
+    currLink = links["Bernard of Clairvaux"] 
+    f = urllib.request.urlopen(currLink).read().decode('utf-8','ignore')
+    soup = BeautifulSoup(f,'html.parser')
+    avoid = r'The|Medieval' #To avoid links
+    chapterFlag = r'^ADMONITIO|^CAPUT'
+    title = soup.title.text.strip()
+    soup = cleanText(soup)  #use clean text method
+    
+    author = "Bernard of Clairvaux"
+    date = re.search(r'\(.*\)',myList[1]).group(0)
+    date = re.sub(r'\(|\)',"",date)
+    verseNum = ""
+    returnList = []
+    innerList = []
+    chapter = ""
+    for s in soup:
+        if re.search(avoid,s):  #check if it is an unnecesarry href
+            continue
+        if re.search(chapterFlag,s):
+            chapter = s
+            continue
+        if re.search(r'^[0-9]+',s):
+                verseNum = re.search(r'^[0-9]+',s).group(0)
+                s = re.sub(r'^[0-9]+\.* *',"",s)
+        innerList = [title,"Latin",author,date,chapter,verseNum,
+                     s,currLink]
+        returnList.append(innerList)
+    return returnList
 
                    
                    
