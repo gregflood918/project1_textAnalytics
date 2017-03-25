@@ -54,23 +54,44 @@ def createDB():
         (title TEXT,book TEXT,language TEXT,author TEXT,
         dates TEXT,chapter TEXT,verse TEXT, passage TEXT,
         link TEXT)''')   
-        c.commit()
+        conn.commit()
         c.close()
+        conn.close()
         return         
     except:
         print("Table Already Exists")
         return
         
-def populateDB(records):    
+def populateDB(records):  
+#Function for batch insert of latin text into DB created in createDB()
+    conn = sqlite3.connect(r"latintext.db")
+    #c = conn.cursor()
+    #Loop through array length
+    try:
+        conn.executemany('''INSERT INTO latintext VALUES (?, ?, ?, ?, ?, ?, ?,
+        ?, ?)''', records)
+        conn.commit()
+    except sqlite3.IntegrityError:
+        print("Error")
+    #for i in range(len(records)):
+    #    c.execute("INSERT INTO latintext VALUES (?,?,?,?,?,?,?,?,?)",
+    #              (records[i][0],records[i][1],records[i][2],records[i][3],
+    #               records[i][4],records[i][5],records[i][6],records[i][7],records[i][8]))
+    conn.commit()
+    conn.close()
+    return
+    
+    
+def populateDB2(records):    
     conn = sqlite3.connect(r"latintext.db")
     c = conn.cursor()
     #Loop through array length
     for i in range(len(records)):
         c.execute("INSERT INTO latintext VALUES (?,?,?,?,?,?,?,?,?)",
-                  (records[i][0],records[i][1],records[i][2],records[i][3],\
+                  (records[i][0],records[i][1],records[i][2],records[i][3],
                    records[i][4],records[i][5],records[i][6],records[i][7],records[i][8]))
-    c.commit()
-    c.close()
+    conn.commit()
+    conn.close()
     return
 
     
@@ -327,6 +348,7 @@ def fetchSeverus():
     
     returnList = []
     innerList = []
+    linkNum = -1
 
     #nested for loop to cycle through each link
     #all text from each link is added to the same list of lists
@@ -339,7 +361,7 @@ def fetchSeverus():
         else:
             book = s[0]+ " - " + s[1]
             s=s[2:]
-
+        linkNum += 1
         for innerS in s:
             if re.search(avoid,innerS):  #check if it is an unnecesarry href
                 continue
@@ -348,7 +370,7 @@ def fetchSeverus():
                 verseNum = 1
                 continue
             innerList = [title,book,"Latin",author,dates,chapter,verseNum,
-                     innerS,("http://thelatinlibrary.com/" + testLinks[1])]
+                     innerS,("http://thelatinlibrary.com/" + testLinks[linkNum])]
             verseNum += 1
             returnList.append(innerList)       
     return returnList        #Possibly may have to come back here and cast the versenum to a string
@@ -364,7 +386,8 @@ def fetchBernard():
     soup = BeautifulSoup(f,'html.parser')
     avoid = r'The|Medieval' #To avoid links
     chapterFlag = r'^ADMONITIO|^CAPUT'
-    title = soup.title.text.strip()
+    titles = "St. Bernard"
+    book = soup.title.text.strip()
     soup = cleanText(soup)  #use clean text method
     
     author = "Bernard of Clairvaux"
@@ -383,7 +406,7 @@ def fetchBernard():
         if re.search(r'^[0-9]+',s):
                 verseNum = re.search(r'^[0-9]+',s).group(0)
                 s = re.sub(r'^[0-9]+\.* *',"",s)
-        innerList = [title,"Latin",author,date,chapter,verseNum,
+        innerList = [titles,book,"Latin",author,date,chapter,verseNum,
                      s,currLink]
         returnList.append(innerList)
     return returnList
@@ -451,14 +474,12 @@ def fetchGregory():
     verseNum = 1
     verse = ""
     versePrefix = "" #trying to create more helpful verse numbers
-
+    linkNum = -1 #For cycling throuhg links
     #nested for loop to cycle through each link
     #all text from each link is added to the same list of lists
     for s in soupsOn:  
-        print(type(s))
         #Get book name
         pageHeads = s.find("p",class_="pagehead")
-        print(pageHeads)
         pageHeads = re.sub('<.*?>',"\n",pageHeads.text) #Remove tags
         pageHeads = pageHeads.split('\n')
         book = " ".join(pageHeads).strip()
@@ -473,6 +494,7 @@ def fetchGregory():
         textList = [x for x in textList if x != " "] #remove space elements
         textList = [x.strip() for x in textList if x!= " "] 
         verseNum = 1
+        linkNum +=1 #increment link number
         #Inner loop
         for inner in textList:
             if re.search(avoid,inner):  #check if it is an unnecesarry href
@@ -489,7 +511,7 @@ def fetchGregory():
                 continue
             verse = str(versePrefix) + " : " + str(verseNum) #More helpful numbers
             innerList = [title,book,"Latin",author,dates,chapter,verse,
-                     inner,("http://thelatinlibrary.com/" + testLinks[1])]
+                     inner,("http://thelatinlibrary.com/" + testLinks[linkNum])]
             verseNum += 1
             returnList.append(innerList)       
     return returnList       
