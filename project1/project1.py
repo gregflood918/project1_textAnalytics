@@ -23,8 +23,7 @@ import urllib.request
 import re
 from bs4 import BeautifulSoup
 import sqlite3
-import os
-import random
+
 
 #We will start with Claudius Caesar (smaller collection)
 #Gregory the 9th
@@ -73,26 +72,10 @@ def populateDB(records):
         conn.commit()
     except sqlite3.IntegrityError:
         print("Error")
-    #for i in range(len(records)):
-    #    c.execute("INSERT INTO latintext VALUES (?,?,?,?,?,?,?,?,?)",
-    #              (records[i][0],records[i][1],records[i][2],records[i][3],
-    #               records[i][4],records[i][5],records[i][6],records[i][7],records[i][8]))
     conn.commit()
     conn.close()
     return
     
-    
-def populateDB2(records):    
-    conn = sqlite3.connect(r"latintext.db")
-    c = conn.cursor()
-    #Loop through array length
-    for i in range(len(records)):
-        c.execute("INSERT INTO latintext VALUES (?,?,?,?,?,?,?,?,?)",
-                  (records[i][0],records[i][1],records[i][2],records[i][3],
-                   records[i][4],records[i][5],records[i][6],records[i][7],records[i][8]))
-    conn.commit()
-    conn.close()
-    return
 
     
 '''
@@ -106,16 +89,26 @@ def cleanText(soup):
     temp = re.sub('<.*?>',"",str(soup.body)) #Remove tags
     temp = re.sub(r' +',' ',temp) #replace multiple spaces with single space
     temp = re.sub(r'\xa0','\n',temp) #replace \xa0 w/ \n
-    temp = re.sub(r'[ ]*\|[ ]*'," ",temp) #replace | with spaces
+    #temp = re.sub(r'[ ]*\|[ ]*'," ",temp) #replace | with spaces
     temp = re.sub(r'\([0-9]+\)','\n',temp) #For parsing sulpicius severus
-    #MOVE BACK IF THIS CAUSES PROBLEMS
     temp = temp.split(('\n')) #split on newlines
     textList = [x for x in temp if x] #remove empty elements
     textList = [x for x in textList if x != " "] #remove space elements
     textList = [x.strip() for x in textList if x!= " "] 
     textList = [x for x in textList if x] #fixes problem with Anselm
-
     return textList
+    
+    
+def cleanJustText(textList):
+#Utility function for more specfiic parsing of test.  This would be
+#used in cases where we have returned a list from clean text, but want
+#to subdivide the text further based on punctuation. Parameter is a list
+    textList = [x for x in textList if x] #remove empty elements
+    textList = [x for x in textList if x != " "] #remove space elements
+    textList = [x.strip() for x in textList if x!= " "] 
+    textList = [x for x in textList if x] #fixes problem with Anselm
+    return textList
+    
     
 def getLinks(soup):
 #Utility function that returns links on a page
@@ -134,11 +127,13 @@ returns their contents as a list of lists
 '''   
        
 def fetchClaudius():
-#Function that retrives parses the Claudius Beautiful Soup object.  Returns
-# a list of list, where each inner list consists of the seven elements 
+#Function that retrieves and parses the Claudius Beautiful Soup object.  Returns
+# a list of list, where each inner list consists of the 9 elements 
 #consistent with the sqlite db schema.  Note that the 'verses' in this work 
-#are replaced by paragraph number. Since the online text is unlabled, it is
-#easier to count paragraphs rather than count | characters
+#are replaced by paragraph number and the verse number as delimited by 
+#the | character in the test/
+#The format is "Paragraph ### : Verse ### 
+
     global links
     currLink = links["Claudius Caesar"]    
     f = urllib.request.urlopen(currLink).read().decode('utf-8')
@@ -163,16 +158,23 @@ def fetchClaudius():
             continue
         if re.search(avoid,i):
             continue
-        innerList = [title,book,"Latin",author,"",chapter,paragraphNum,
-                     i,currLink]
-        returnList.append(innerList)
+        
+        i = i.split('|')
+        i = cleanJustText(i)
+        verse = 1
+        for j in i:
+            paraVerse = "Paragraph " + str(paragraphNum) +  ": Verse " + str(verse)
+            innerList = [title,book,"Latin",author,"",chapter,paraVerse,
+                     j,currLink]
+            verse +=1
+            returnList.append(innerList)
         paragraphNum +=1
     return returnList    
    
      
 def fetchCreeds():
 #Function that retrives parses the Early Christian Creeds.  Returns
-# a list of list, where each inner list consists of the seven elements 
+# a list of list, where each inner list consists of the 9 elements 
 #consistent with the sqlite db schema.  Note that since there are not any
 #labeled verses in this text, the natural text breaks will be used as verse
 #number.  The verses will reset for each new creed in the work.
@@ -185,7 +187,7 @@ def fetchCreeds():
     title = soup.title.text.strip()  #Get title
     author = "" #unknown
     dates = "" #unknown
-    book = "" #We will leave books blank, as there is pnly one "book" here
+    book = "" #We will leave books blank, as there is only one "book" here
     
     chapters = set() #we will use this set for parsing of chapters
     pageHeads=soup.find_all("p",class_="pagehead") #prayer names stored in paghead class
@@ -205,7 +207,7 @@ def fetchCreeds():
             continue
         if re.search(avoid,i):
             continue
-        innerList = [title,book,"Latin",author,dates,chapter,verseNum,
+        innerList = [title,book,"Latin",author,dates,chapter,str(verseNum),
                      i,currLink]
         returnList.append(innerList)
         verseNum +=1
@@ -256,13 +258,14 @@ def fetchAnselm():
 #formatting.  Thus, this function is bespoke for this collection and is a little
 #longer than desirous. But it returns a list of list containtaining all elements
 #from the collection in an sqlite db format
+#Here, verseNumber is replaced with paragraph number and
+#chapter can contain the title of the chapter
     global links
     currLink = links["Anselm"] 
     f = urllib.request.urlopen(currLink).read().decode('utf-8')
     soup = BeautifulSoup(f,'html.parser')
     avoid = r'The|Christian' #To avoid links
-    title = soup.title.text.strip()
-    
+    title = soup.title.text.strip()   
     temp = soup.find('p',{'class':'pagehead'}).text.split('\n')
     author = temp[0]
     dates = re.sub(r'[\(\)]',"",temp[1]) #remove parentheses
@@ -298,7 +301,7 @@ def fetchAnselm():
                      s,("http://thelatinlibrary.com/" + testLinks[0])]
         paraNum += 1
         returnList.append(innerList)
-    
+
     #parsing book 2
     book = soupsOn[1][1]
     soupsOn[1][26:]  #Trim out the extraneous
@@ -308,8 +311,9 @@ def fetchAnselm():
         if re.search(avoid,s):  #check if it is an unnecesarry href
             continue
         if re.search(r'^[0-9]',s):
-            chapter = re.search(r'^[0-9]',s).group(0)
+            chapter = s
             verseNum = 1
+            continue
         if re.search(r'^Prooemium',s):
             chapter = 'Prooemium'
             verseNum = 1
@@ -318,7 +322,7 @@ def fetchAnselm():
                      s,("http://thelatinlibrary.com/" + testLinks[1])]
         verseNum += 1
         returnList.append(innerList)
-        
+     
     return returnList
 
         
@@ -326,6 +330,7 @@ def fetchSeverus():
 #Functin that fetches text from the collection of works by Sulpicius Severus
 #on the latin library.  Returns a list of list in the format defined in the
 #problem description, i.e. a format conducive to sqlite db storage.
+#Verses are divided by the format in the test (###) in all three books
     global links
     currLink = links["Sulpicius Severus"] 
     f = urllib.request.urlopen(currLink).read().decode('utf-8','ignore')
@@ -380,6 +385,9 @@ def fetchBernard():
 #Function that retrieves the works of St. Bernard of Clairvaux from the
 #latin library and returns a list of list formatted per the database
 #schema of sqlite createDB function
+#Since this text has book names, chapter names, and paragraph number, the
+#verse number is replaced with paragraph number and the verse text is replaced
+#with the paragraph text.  
     global links
     currLink = links["Bernard of Clairvaux"] 
     f = urllib.request.urlopen(currLink).read().decode('utf-8','ignore')
@@ -415,7 +423,8 @@ def fetchBernard():
 def fetchDiesIrae():  
 #Function that retrieves the poem (?) 'Dies Irae' from the
 #latin library and returns a list of list formatted per the database
-#schema of sqlite createDB function
+#schema of sqlite createDB function.  There are no chapters or books
+#in this text, so the verse number refers to the line number on the page
     global links
     currLink = links["Dies Irae"] 
     f = urllib.request.urlopen(currLink).read().decode('utf-8','ignore')
@@ -448,7 +457,7 @@ def fetchGregory():
 #total.  All 4 books are returned within a single list of lists in the format of
 #the sqlite database.  The verse number gives teh chapter from the text, followed
 #by the paragraph number within that subsection.  This is more helpful if trying
-#to find something in the text
+#to find something in the text.    
     global links
     currLink = links['Gregory IX']
     f = urllib.request.urlopen(currLink).read().decode('utf-8','ignore')
@@ -584,7 +593,7 @@ def status():
     
     #Grab 5 random rows
     for i in range(5):
-        c.execute("SELECT book,verse FROM latintext ORDER BY RANDOM() LIMIT 1")
+        c.execute("SELECT book,passage FROM latintext ORDER BY RANDOM() LIMIT 1")
         print(c.fetchall())
         
     conn.close()
