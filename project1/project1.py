@@ -15,8 +15,7 @@ Created on Mon Mar 20 14:44:30 2017
 #Anselm - http://www.thelatinlibrary.com/anselm.html
 #Christian Creeds - http://www.thelatinlibrary.com/creeds.html
 #Sulpicius Severus - http://www.thelatinlibrary.com/sulpiciusseverus.html
-
-
+#Dies Irae - http://www.thelatinlibrary.com/diesirae.html
 
 #Imported packages
 import urllib.request
@@ -31,7 +30,7 @@ import sqlite3
 links={"Gregory IX":"http://www.thelatinlibrary.com/gregory.html",
        "Claudius Caesar":"http://thelatinlibrary.com/claud.inscr.html",
        "Bernard of Clairvaux":"http://www.thelatinlibrary.com/bernardclairvaux.shtml",
-       "Roman Epitaphs":"http://www.thelatinlibrary.com/epitaphs.html",
+       "Roman Epitaphs":"http://thelatinlibrary.com/epitaphs.html",
        "Anselm":"http://www.thelatinlibrary.com/anselm.html",
        "Dies Irae":"http://www.thelatinlibrary.com/diesirae.html",
        "Christian Creeds":"http://www.thelatinlibrary.com/creeds.html",
@@ -49,10 +48,10 @@ def createDB():
     try:         
         conn = sqlite3.connect(r"latintext.db")
         c = conn.cursor()
-        c.execute('''CREATE TABLE latintext
-        (title TEXT,book TEXT,language TEXT,author TEXT,
+        c.execute('''CREATE VIRTUAL TABLE latintext
+        USING FTS4(title TEXT,book TEXT,language TEXT,author TEXT,
         dates TEXT,chapter TEXT,verse TEXT, passage TEXT,
-        link TEXT)''')   
+        link TEXT);''')   
         conn.commit()
         c.close()
         conn.close()
@@ -276,7 +275,10 @@ def fetchAnselm():
     #Create a list of beautiful soup objects for each separate book
     #in the collection
     soupsOn = []
+    cleanLinks = []
     for l in testLinks:
+        li = "http://thelatinlibrary.com/" + l
+        cleanLinks.extend(li)
         f = urllib.request.urlopen("http://thelatinlibrary.com/" + l).\
         read().decode('utf-8','ignore')
         soupsOn.append(cleanText(BeautifulSoup(f,'html.parser')))
@@ -457,7 +459,7 @@ def fetchGregory():
 #total.  All 4 books are returned within a single list of lists in the format of
 #the sqlite database.  The verse number gives teh chapter from the text, followed
 #by the paragraph number within that subsection.  This is more helpful if trying
-#to find something in the text.    
+#to find something in the text. Length of text is 4610 along 
     global links
     currLink = links['Gregory IX']
     f = urllib.request.urlopen(currLink).read().decode('utf-8','ignore')
@@ -478,7 +480,7 @@ def fetchGregory():
     returnList = []
     innerList = []
     chapterMatch = r'TITULUS|GREGORIxUS'
-    verseMatch = r'CAP\.* *[A-Z]+\.*'
+    verseMatch = r'^CAP\.* *[A-Z]+\.*'
     chapter = ""
     verseNum = 1
     verse = ""
@@ -513,12 +515,14 @@ def fetchGregory():
                 verseNum = 1
                 continue
             if re.search(verseMatch,inner):
-                versePrefix = inner
+                matched = re.match(verseMatch,inner)
+                versePrefix = matched.group(0)
+                inner = re.sub(versePrefix,"",inner).strip()
                 verseNum = 1
                 continue
             if not chapter: #skips the pageheader.  won't go until it has a chapter name
                 continue
-            verse = str(versePrefix) + " : " + str(verseNum) #More helpful numbers
+            verse = str(versePrefix) + " : Paragraph " + str(verseNum) #More helpful numbers
             innerList = [title,book,"Latin",author,dates,chapter,verse,
                      inner,("http://thelatinlibrary.com/" + testLinks[linkNum])]
             verseNum += 1
@@ -590,14 +594,19 @@ def status():
     dbLength=c.fetchone()[0]
     #Print db length
     print("Total Number of Rows: ",dbLength)  
+    conn.close()
+    if(dbLength>0):
+        return False
+    else:
+        return True
     
+    ''' Optional code to display 5 random entries from DB
     #Grab 5 random rows
     for i in range(5):
         c.execute("SELECT book,passage FROM latintext ORDER BY RANDOM() LIMIT 1")
         print(c.fetchall())
-        
-    conn.close()
-    
     return
+    '''   
+
 
     

@@ -134,16 +134,16 @@ def test_diesIrae():
     
 def test_gregory():
 #Function to test project1.fetchGregory().  The writings of
-#Gregory IX have 4581 entries based on the separtion scheme. Thus,
-#the length of the retrieved test should be 4581.  Also, since
+#Gregory IX have 4610 entries based on the separtion scheme. Thus,
+#the length of the retrieved test should be 4610.  Also, since
 #the database that text will be inserted into has 9 data fields,
-#the length of each of the 4581 entries should be 9.
+#the length of each of the 4610 entries should be 9.
     data = project1.fetchGregory()
     textLength = len(data)
     flag = True
     for text in data:
         if len(text) != 9:
             flag = False
-    assert textLength == 4581 and flag
+    assert textLength == 4610 and flag
 
 
